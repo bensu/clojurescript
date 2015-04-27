@@ -276,7 +276,10 @@
                [(fn []
                    (cljs.test/set-env! ~env)
                    (do-report (deref ~summary))
-                   (cljs.test/clear-env!))]))))
+                   (cljs.test/clear-env!))]
+               (if cljs.test/*on-testing-complete-fn*
+                 [(fn [] 
+                    (cljs.test/*on-testing-complete-fn* ~summary))])))))
 
 (defmacro run-tests
   "Runs all tests in the given namespaces; prints results.

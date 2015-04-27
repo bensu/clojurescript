@@ -549,9 +549,25 @@
 ;; =============================================================================
 ;; Running Tests, high level functions
 
-(defn successful?
+(defn ^:export successful?
   "Returns true if the given test summary indicates all tests
   were successful, false otherwise."
   [summary]
   (and (zero? (:fail summary 0))
        (zero? (:error summary 0))))
+
+(def ^:dynamic *on-testing-complete-fn* nil)
+
+(defn ^:export set-on-testing-complete!
+  "Sets a function f to be called when all tests are completed 
+  (including async tests) with test summary as argument.
+  Useful to terminate test scripts.
+  
+  Example: 
+  (set-on-testing-complete! (fn [summary]
+                              (exit-script (if (successful? summary) 
+                                             0 
+                                             1))))"
+  [f]
+  {:pre [(ifn? f)]}
+  (set! *on-testing-complete-fn* f))
