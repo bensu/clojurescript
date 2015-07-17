@@ -915,13 +915,15 @@
                                                (:arglists-meta var)))))))]
               (analyze expr-env m))})))
 
+(defrecord VarOp [op env form var sym meta])
+
 (defmethod parse 'var
   [op env [_ sym :as form] _ _]
-  (merge
-    {:env env
-     :op :var-special
-     :form form}
-    (var-ast env sym)))
+  (map->VarOp (merge
+                {:env env
+                 :op :var-special
+                 :form form}
+                (var-ast env sym))))
 
 (defmethod parse 'if
   [op env [_ test then else :as form] name _]
