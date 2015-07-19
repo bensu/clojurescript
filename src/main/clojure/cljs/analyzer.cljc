@@ -1481,6 +1481,8 @@
   [_ env [_ x] _ _]
   (analyze (assoc env :quoted? true) x))
 
+(defrecord NewExpr [op env form ctor args children tag])
+
 (defmethod parse 'new
   [_ env [_ ctor & args :as form] _ _]
   (when-not (symbol? ctor) 
@@ -1498,16 +1500,19 @@
      (when (and (not (-> ctor meta :internal-ctor))
                 known-num-fields (not= known-num-fields argc))
        (warning :fn-arity env {:argc argc :ctor ctor}))
-     {:env env :op :new :form form :ctor ctorexpr :args argexprs
-      :children (into [ctorexpr] argexprs)
-      :tag (let [name (-> ctorexpr :info :name)]
-             (or ('{js/Object object
-                    js/String string
-                    js/Array  array
-                    js/Number number
-                    js/Function function
-                    js/Boolean boolean} name)
-                 name))})))
+     (NewExpr. :new env form ctorexpr argexprs (into [ctorexpr] argexprs)
+               (let [name (-> ctorexpr :info :name)]
+                 (or ('{js/Object object
+                        js/String string
+                        js/Array  array
+                        js/Number number
+                        js/Function function
+                        js/Boolean boolean} name)
+                     name))))))
+
+(defrecord NoExpr [op env])
+
+(defrecord SetExpr [op env form target val children])
 
 (defmethod parse 'set!
   [_ env [_ target val alt :as form] _ _]
@@ -1547,9 +1552,9 @@
        (when-not targetexpr 
          (throw (error env "set! target must be a field or a symbol naming a var")))
        (cond
-        (= targetexpr ::set-unchecked-if) {:env env :op :no-op}
-        :else {:env env :op :set! :form form :target targetexpr :val valexpr
-               :children [targetexpr valexpr]})))))
+        (= targetexpr ::set-unchecked-if) (NoExpr. :no-op env)
+        :else (SetExpr. :set! env form targetexpr
+                        valexpr [targetexpr valexpr]))))))
 
 (declare analyze-file)
 
