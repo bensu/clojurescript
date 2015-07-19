@@ -960,16 +960,15 @@
                              ((some-fn number? string? char?) (:form t)))))
               (apply concat tests))
       "case* tests must be numbers, strings, or constants")
-    {:env env :op :case* :form form
-     :v v :tests tests :thens thens :default default
-     :children (vec (concat [v] tests thens (if default [default])))}))
+    (CaseExpr. :case* env form v tests thens default
+               (vec (concat [v] tests thens (if default [default]))))))
+
+(defrecord ThrowExpr [op env form throw children])
 
 (defmethod parse 'throw
   [op env [_ throw :as form] name _]
   (let [throw-expr (disallowing-recur (analyze (assoc env :context :expr) throw))]
-    {:env env :op :throw :form form
-     :throw throw-expr
-     :children [throw-expr]}))
+    (ThrowExpr. :throw env form throw-expr [throw-expr])))
 
 (defmethod parse 'try
   [op env [_ & body :as form] name _]
