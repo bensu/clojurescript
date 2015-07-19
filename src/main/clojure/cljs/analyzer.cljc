@@ -780,11 +780,13 @@
   (ConstExpr. :constant env sym 'cljs.core/Keyword))
 
 (defn get-tag [e]
-  (if-let [tag (-> e :tag)]
-    tag
-    (if-let [tag (-> e :info :tag)]
+  (let [tag (-> e :tag)]
+    (if-not (nil? tag)
       tag
-      (-> e :form meta :tag))))
+      (let [tag (-> e :info :tag)]
+        (if-not (nil? tag)
+          tag
+          (-> e :form meta :tag))))))
 
 (defn find-matching-method [f params]
   ;; if local fn, need to look in :info
@@ -1899,16 +1901,17 @@
                   ns-info))
               ns-info)]
         (swap! env/*compiler* update-in [::namespaces name] merge ns-info)
-        (NsExpr. :ns env form @deps @reload @reloads
-                 (:name ns-info) (:doc ns-info) (:excludes ns-info)
-                 (:use-macros ns-info) (:require-macros ns-info)
-                 (if (@reload :use) 
-                   (with-meta (:uses ns-info) {(@reload :use) true})
-                   (:uses ns-info))
-                 (if (@reload :require)
-                   (with-meta (:requires ns-info) {(@reload :require) true})
-                   (:requires ns-info))
-                 (:imports ns-info))))))
+        (let [ns-info' (cond-> ns-info
+                         (@reload :use)
+                         (update-in [:uses]
+                           (fn [m] (with-meta m {(@reload :use) true})))
+                         (@reload :require)
+                         (update-in [:requires]
+                           (fn [m] (with-meta m {(@reload :require) true}))))]
+          (NsExpr. :ns env form @deps @reload @reloads
+                   (:name ns-info') (:doc ns-info') (:excludes ns-info')
+                   (:use-macros ns-info') (:require-macros ns-info')
+                   (:uses ns-info') (:requires ns-info') (:imports ns-info')))))))
 
 (defrecord TypeExpr [op env form t fields pmasks body])
 
