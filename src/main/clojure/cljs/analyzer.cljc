@@ -1462,6 +1462,8 @@
   [op encl-env form _ _]
   (analyze-let encl-env form true))
 
+(defrecord RecurExpr [op env form frame exprs children])
+
 (defmethod parse 'recur
   [op env [_ & exprs :as form] _ _]
   (let [context (:context env)
@@ -1472,10 +1474,7 @@
     (when-not (= (count exprs) (count (:params frame))) 
       (throw (error env "recur argument count mismatch")))
     (reset! (:flag frame) true)
-    (assoc {:env env :op :recur :form form}
-      :frame frame
-      :exprs exprs
-      :children exprs)))
+    (RecurExpr. :recur env form frame exprs exprs)))
 
 (defmethod parse 'quote
   [_ env [_ x] _ _]
@@ -2017,6 +2016,10 @@
                  (list* '. dot-form) " with classification "
                  (classify-dot-form dot-form))))))
 
+(defrecord DotAccessExpr [op env form target field tag children])
+
+(defrecord DotCallExpr [op env form target method args tag children])
+
 (defn analyze-dot [env target field member+ form]
   (let [v [target field member+]
         {:keys [dot-action target method field args]} (build-dot-form v)
@@ -2026,23 +2029,11 @@
         tag        (:tag form-meta)]
     (case dot-action
       ::access (let [children [targetexpr]]
-                 {:op :dot
-                  :env env
-                  :form form
-                  :target targetexpr
-                  :field field
-                  :children children
-                  :tag tag})
+                 (DotAccessExpr. :dot env form targetexpr field tag children))
       ::call   (let [argexprs (map #(analyze enve %) args)
                      children (into [targetexpr] argexprs)]
-                 {:op :dot
-                  :env env
-                  :form form
-                  :target targetexpr
-                  :method method
-                  :args argexprs
-                  :children children
-                  :tag tag}))))
+                 (DotCallExpr. :dot env form targetexpr method
+                               argexprs tag children)))))
 
 (defmethod parse '.
   [_ env [_ target & [field & member+] :as form] _ _]
