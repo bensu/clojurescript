@@ -2357,23 +2357,28 @@
                                  (vec (interleave ks vs))
                                  'cljs.core/IMap))))
 
+(defrecord SeqExpr [op env form items children tag])
+
 (defn analyze-list
   [env form]
   (let [expr-env (assoc env :context :expr)
         items (disallowing-recur (doall (map #(analyze expr-env %) form)))]
-    (analyze-wrap-meta {:op :list :env env :form form :items items :children items :tag 'cljs.core/IList})))
+    (analyze-wrap-meta (SeqExpr. :list env form items items 'cljs.core/IList))))
 
 (defn analyze-vector
   [env form]
   (let [expr-env (assoc env :context :expr)
         items (disallowing-recur (vec (map #(analyze expr-env %) form)))]
-    (analyze-wrap-meta {:op :vector :env env :form form :items items :children items :tag 'cljs.core/IVector})))
+    (analyze-wrap-meta (SeqExpr. :vector env form items
+                                 items 'cljs.core/IVector))))
 
 (defn analyze-set
   [env form ]
   (let [expr-env (assoc env :context :expr)
         items (disallowing-recur (vec (map #(analyze expr-env %) form)))]
-    (analyze-wrap-meta {:op :set :env env :form form :items items :children items :tag 'cljs.core/ISet})))
+    (analyze-wrap-meta (SeqExpr. :set env form items items 'cljs.core/ISet))))
+
+(defrecord JsValExpr [op env form js-type items tag children])
 
 (defn analyze-js-value
   [env ^JSValue form]
@@ -2383,16 +2388,13 @@
                 (zipmap (keys val)
                         (disallowing-recur (doall (map #(analyze expr-env %) (vals val)))))
                 (disallowing-recur (doall (map #(analyze expr-env %) val))))]
-    {:op :js-value
-     :js-type (if (map? val) :object :array)
-     :env env
-     :form form
-     :items items
-     :children items
-     :tag (if (map? val) 'object 'array)}))
+    (JsValExpr. :js-value env form (if (map? val) :object :array)
+                items (if (map? val) 'object 'array) items)))
 
 (defn elide-reader-meta [m]
   (dissoc m :file :line :column :end-column :end-line :source))
+
+(defrecord MetaExpr [op env form meta expr children])
 
 (defn analyze-wrap-meta [expr]
   (let [form (:form expr)
@@ -2401,8 +2403,7 @@
       (let [env (:env expr) ; take on expr's context ourselves
             expr (assoc-in expr [:env :context] :expr) ; change expr to :expr
             meta-expr (analyze-map (:env expr) m)]
-        {:op :meta :env env :form form
-         :meta meta-expr :expr expr :children [meta-expr expr]})
+        (MetaExpr. :meta env form meta-expr expr [meta-expr expr]))
       expr)))
 
 (defn infer-type [env ast _]
