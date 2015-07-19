@@ -1030,6 +1030,8 @@
 
     (TryExpr. :try env form try catch finally e [try catch finally])))
 
+(defrecord VarExpr [op env form info])
+
 (defrecord DefExpr [op env form name var doc jsdoc init
                     var-ast test ret-tag tag dynamic export children])
 
@@ -1061,16 +1063,16 @@
         (throw (error env "Too many arguments to def"))))
     (when-let [v (get-in @env/*compiler* [::namespaces ns-name :defs sym])]
       (when (and (not *allow-redef*)
-                 (not (:declared v))
-                 (not (:declared sym-meta))
-                 *file-defs*
-                 (get @*file-defs* sym))
+              (not (:declared v))
+              (not (:declared sym-meta))
+              *file-defs*
+              (get @*file-defs* sym))
         (warning :redef-in-file env {:sym sym :line (:line v)})))
     (when *file-defs*
       (swap! *file-defs* conj sym))
     (let [env (if (or (and (not= ns-name 'cljs.core)
-                           (core-name? env sym))
-                      (get-in @env/*compiler* [::namespaces ns-name :uses sym]))
+                        (core-name? env sym))
+                    (get-in @env/*compiler* [::namespaces ns-name :uses sym]))
                 (let [ev (resolve-existing-var (dissoc env :locals) sym)]
                   (warning :redef env {:sym sym :ns (:ns ev) :ns-name ns-name})
                   (swap! env/*compiler* update-in [::namespaces ns-name :excludes] conj sym)
@@ -1095,7 +1097,7 @@
           doc (or (:doc args) (-> sym meta :doc))]
       (when-let [v (get-in @env/*compiler* [::namespaces ns-name :defs sym])]
         (when (and (not (-> sym meta :declared))
-                   (and (:fn-var v) (not fn-var?)))
+                (and (:fn-var v) (not fn-var?)))
           (warning :fn-var env {:ns-name ns-name :sym sym})))
       (swap! env/*compiler* assoc-in [::namespaces ns-name :defs sym]
         (merge 
@@ -1139,23 +1141,23 @@
                    :arglists-meta (doall (map meta (:arglists sym-meta)))}))) )
           (when (and fn-var? tag)
             {:ret-tag tag})))
-      (DefExpr. :def env form var-name 
-        	;; TODO: check if this map is a VarExpr - Sebastian
-                (assoc (analyze (-> env (dissoc :locals)
-                                   (assoc :context :expr)
-                                   (assoc :def-var true))
-                                sym)
-                  :op :var)
-                doc (:jsdoc sym-meta) init-expr
-                (when (:def-emits-var env)
-                  (var-ast env sym))
-                (when-let [test (:test sym-meta)]
-                  (analyze (assoc env :context :expr) test))
-                (when (and tag fn-var?) tag)
-                (when (and tag (not fn-var?)) tag)
-                (when dynamic true)
-                (when export-as export-as)
-                (when init-expr [init-expr])))))
+      ;; TODO: Can be refactored into one -> operation - Sebastian 
+      (let [sym-var (analyze (-> env (dissoc :locals)
+                               (assoc :context :expr)
+                               (assoc :def-var true))
+                      sym)]
+        (DefExpr. :def env form var-name 
+          (VarExpr. :var (:env sym-var) (:form sym-var) (:info sym-var))
+          doc (:jsdoc sym-meta) init-expr
+          (when (:def-emits-var env)
+            (var-ast env sym))
+          (when-let [test (:test sym-meta)]
+            (analyze (assoc env :context :expr) test))
+          (when (and tag fn-var?) tag)
+          (when (and tag (not fn-var?)) tag)
+          (when dynamic true)
+          (when export-as export-as)
+          (when init-expr [init-expr]))))))
 
 (defrecord UnresolvedVarExpr [op env name line column tag 
                               shadow info binding-form?
@@ -2188,7 +2190,7 @@
   [env form]
   (disallowing-recur (parse-invoke* env form)))
 
-(defrecord VarExpr [op env form info])
+
 
 (defn analyze-symbol
   "Finds the var associated with sym"
