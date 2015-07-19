@@ -1235,6 +1235,10 @@
 (defn analyze-fn-methods-pass2 [menv locals type meths]
   (no-warn (analyze-fn-methods-pass2* menv locals type meths)))
 
+(defrecord FnExpr [op env form name methods variadic tag
+                   recur-frames loop-lets jsdoc max-fixed-arity
+                   proto-impl protocoll-inline children])
+
 (defmethod parse 'fn*
   [op env [_ & args :as form] name _]
   (let [[name meths] (if (symbol? (first args))
@@ -1283,20 +1287,9 @@
         js-doc       (when (true? variadic)
                        "@param {...*} var_args")
         children     (mapv :expr methods)
-        ast          {:op :fn
-                      :env env
-                      :form form
-                      :name name-var
-                      :methods methods
-                      :variadic variadic
-                      :tag 'function
-                      :recur-frames *recur-frames*
-                      :loop-lets *loop-lets*
-                      :jsdoc [js-doc]
-                      :max-fixed-arity mfa
-                      :protocol-impl proto-impl
-                      :protocol-inline proto-inline
-                      :children children}]
+        ast          (FnExpr. :fn env form name-var methods variadic 'function
+                              *recur-frames* *loop-lets* [js-doc] mfa
+                              proto-impl proto-inline children)]
     (let [variadic-methods (filter :variadic methods)
           variadic-params  (count (:params (first variadic-methods)))
           param-counts     (map (comp count :params) methods)]
@@ -1307,6 +1300,8 @@
       (when (not= (distinct param-counts) param-counts)
         (warning :overload-arity env {:name name-var})))
     (analyze-wrap-meta ast)))
+
+(defrecord LetExpr [op env form bindings expr children])
 
 (defmethod parse 'letfn*
   [op env [_ bindings & exprs :as form] name _]
@@ -1349,8 +1344,7 @@
                      (conj bes be')]))
           [meth-env []] bes)
         expr (analyze (assoc meth-env :context (if (= :expr context) :return context)) `(do ~@exprs))]
-    {:env env :op :letfn :bindings bes :expr expr :form form
-     :children (conj (vec (map :init bes)) expr)}))
+    (LetExpr. :letfn env form bes expr (conj (vec (map :init bes)) expr))))
 
 (defn analyze-do-statements* [env exprs]
   (seq (map #(analyze (assoc env :context :statement) %) (butlast exprs))))
