@@ -1140,7 +1140,7 @@
           (when (and fn-var? tag)
             {:ret-tag tag})))
       (DefExpr. :def env form var-name 
-        	;; TODO: check if this map should be a TheVarExpr - Sebastian
+        	;; TODO: check if this map is a VarExpr - Sebastian
                 (assoc (analyze (-> env (dissoc :locals)
                                    (assoc :context :expr)
                                    (assoc :def-var true))
