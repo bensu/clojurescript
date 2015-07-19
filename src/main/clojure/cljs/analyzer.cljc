@@ -2448,6 +2448,8 @@
 
 (def ^:dynamic *passes* nil)
 
+(defrecord ConstExpr [op env form tag])
+
 #?(:clj
    (defn analyze-form [env form name opts]
      (load-core)
@@ -2467,8 +2469,8 @@
                    (string? form) 'string
                    (true? form) 'boolean
                    (false? form) 'boolean)]
-         (cond-> {:op :constant :env env :form form}
-           tag (assoc :tag tag))))))
+         ;; TODO: to avoid nil tags, we could use TaggedConstExpr - Sebastian
+         (ConstExpr. :constant env form tag)))))
 
 #?(:cljs
    (defn analyze-form [env form name opts]
@@ -2488,8 +2490,7 @@
                    (string? form) STRING_SYM
                    (true? form) BOOLEAN_SYM
                    (false? form) BOOLEAN_SYM)]
-         (cond-> {:op :constant :env env :form form}
-           tag (assoc :tag tag))))))
+         (ConstExpr. :constant env form tag)))))
 
 (defn analyze* [env form name opts]
   (let [passes *passes*
