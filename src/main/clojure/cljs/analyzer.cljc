@@ -1812,6 +1812,10 @@
       (symbol (str name-str "$macros"))
       name)))
 
+(defrecord NsExpr [op env form deps reload reloads
+                   name doc excludes use-macros require-macros
+                   uses requires imports])
+
 (defmethod parse 'ns
   [_ env [_ name & args :as form] _ opts]
   (when-not (symbol? name) 
@@ -1896,19 +1900,18 @@
                   ns-info))
               ns-info)]
         (swap! env/*compiler* update-in [::namespaces name] merge ns-info)
-        (merge {:op      :ns
-                :env     env
-                :form    form
-                :deps    @deps
-                :reload  @reload
-                :reloads @reloads}
-          (cond-> ns-info
-            (@reload :use)
-            (update-in [:uses]
-              (fn [m] (with-meta m {(@reload :use) true})))
-            (@reload :require)
-            (update-in [:requires]
-              (fn [m] (with-meta m {(@reload :require) true})))))))))
+        (NsExpr. :ns env form @deps @reload @reloads
+                 (:name ns-info) (:doc ns-info) (:excludes ns-info)
+                 (:use-macros ns-info) (:require-macros ns-info)
+                 (if (@reload :use) 
+                   (with-meta (:uses ns-info) {(@reload :use) true})
+                   (:uses ns-info))
+                 (if (@reload :require)
+                   (with-meta (:requires ns-info) {(@reload :require) true})
+                   (:requires ns-info))
+                 (:imports ns-info))))))
+
+(defrecord TypeExpr [op env form t fields pmasks body])
 
 (defn parse-type
   [op env [_ tsym fields pmasks body :as form]]
@@ -1938,7 +1941,7 @@
                       (dissoc (meta tsym) :protocols)
                       {:protocols (-> tsym meta :protocols)}
                       (source-info tsym env)))))
-    {:op op :env env :form form :t t :fields fields :pmasks pmasks :body (analyze (assoc env :locals locals) body)}))
+    (TypeExpr. op env form t fields pmasks (analyze (assoc env :locals locals) body))))
 
 (defmethod parse 'deftype*
   [_ env form _ _]
