@@ -2098,6 +2098,8 @@
             (contains? t 'double)
             (contains? t 'any))))))
 
+(defrecord JsExpr [op env form segs args tag js-op numeric children])
+
 (defn analyze-js-star* [env jsform args form]
   (let [enve      (assoc env :context :expr)
         argexprs  (vec (map #(analyze enve %) args))
@@ -2112,18 +2114,12 @@
           (warning :invalid-arithmetic env
             {:js-op js-op
              :types (into [] types)}))))
-    {:op :js
-     :env env
-     :segs segs
-     :args argexprs
-     :tag tag
-     :form form
-     :children argexprs
-     :js-op js-op
-     :numeric numeric}))
+    (JsExpr. :js env form segs argexprs tag js-op numeric argexprs)))
 
 (defn analyze-js-star [env jsform args form]
   (disallowing-recur (analyze-js-star* env jsform args form)))
+
+(defrecord JsCodeExpr [op env form code tag js-op numeric])
 
 (defmethod parse 'js*
   [op env [_ jsform & args :as form] _ _]
@@ -2136,13 +2132,7 @@
           form-meta (meta form)
           js-op     (:js-op form-meta)
           numeric   (:numeric form-meta)]
-      {:op :js
-       :env env
-       :form form
-       :code code
-       :tag tag
-       :js-op js-op
-       :numeric numeric})))
+      (JsCodeExpr. :js env form code tag js-op numeric))))
 
 (defn- analyzed?
   #?(:cljs {:tag boolean})
