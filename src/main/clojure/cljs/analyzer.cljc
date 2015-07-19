@@ -970,6 +970,8 @@
   (let [throw-expr (disallowing-recur (analyze (assoc env :context :expr) throw))]
     (ThrowExpr. :throw env form throw-expr [throw-expr])))
 
+(defrecord TryExpr [op env form try catch finally name children])
+
 (defmethod parse 'try
   [op env [_ & body :as form] name _]
   (let [catchenv (update-in env [:context] #(if (= :expr %) :return %))
@@ -1024,12 +1026,7 @@
                 (analyze (assoc catchenv :locals locals) cblock))
         try (analyze (if (or e finally) catchenv env) `(do ~@body))]
 
-    {:env env :op :try :form form
-     :try try
-     :finally finally
-     :name e
-     :catch catch
-     :children [try catch finally]}))
+    (TryExpr. :try env form try catch finally e [try catch finally])))
 
 (defmethod parse 'def
   [op env form name _]
