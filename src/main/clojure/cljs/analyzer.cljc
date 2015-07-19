@@ -1028,6 +1028,9 @@
 
     (TryExpr. :try env form try catch finally e [try catch finally])))
 
+(defrecord DefExpr [op env form name var doc jsdoc init
+                    var-ast test ret-tag tag dynamic export children])
+
 (defmethod parse 'def
   [op env form name _]
   (let [pfn (fn
@@ -1134,32 +1137,22 @@
                    :arglists-meta (doall (map meta (:arglists sym-meta)))}))) )
           (when (and fn-var? tag)
             {:ret-tag tag})))
-      (merge
-        {:env env
-         :op :def
-         :form form
-         :name var-name
-         :var (assoc
-                (analyze
-                  (-> env (dissoc :locals)
-                    (assoc :context :expr)
-                    (assoc :def-var true))
-                  sym)
-                :op :var)
-         :doc doc
-         :jsdoc (:jsdoc sym-meta)
-         :init init-expr}
-        (when (:def-emits-var env)
-          {:var-ast (var-ast env sym)})
-        (when-let [test (:test sym-meta)]
-          {:test (analyze (assoc env :context :expr) test)})
-        (when tag
-          (if fn-var?
-            {:ret-tag tag}
-            {:tag tag}))
-        (when dynamic {:dynamic true})
-        (when export-as {:export export-as})
-        (when init-expr {:children [init-expr]})))))
+      (DefExpr. :def env form var-name 
+                (assoc (analyze (-> env (dissoc :locals)
+                                   (assoc :context :expr)
+                                   (assoc :def-var true))
+                                sym)
+                  :op :var)
+                doc (:jsdoc sym-meta) init-expr
+                (when (:def-emits-var env)
+                  (var-ast env sym))
+                (when-let [test (:test sym-meta)]
+                  (analyze (assoc env :context :expr) test))
+                (when (and tag fn-var?) tag)
+                (when (and tag (not fn-var?)) tag)
+                (when dynamic true)
+                (when export-as export-as)
+                (when init-expr [init-expr])))))
 
 (defn analyze-fn-method-param [env]
   (fn [[locals params] name]
