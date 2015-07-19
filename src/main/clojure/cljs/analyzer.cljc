@@ -771,20 +771,20 @@
    (defmacro allowing-redef [& body]
      `(binding [*allow-redef* true] ~@body)))
 
+(defrecord ConstExpr [op env form tag])
+
 ;; TODO: move this logic out - David
 (defn analyze-keyword
   [env sym]
   (register-constant! env sym)
-  {:op :constant :env env :form sym :tag 'cljs.core/Keyword})
+  (ConstExpr. :constant env sym 'cljs.core/Keyword))
 
 (defn get-tag [e]
-  (let [tag (-> e :tag)]
-    (if-not (nil? tag)
+  (if-let [tag (-> e :tag)]
+    tag
+    (if-let [tag (-> e :info :tag)]
       tag
-      (let [tag (-> e :info :tag)]
-        (if-not (nil? tag)
-          tag
-          (-> e :form meta :tag))))))
+      (-> e :form meta :tag))))
 
 (defn find-matching-method [f params]
   ;; if local fn, need to look in :info
@@ -2447,8 +2447,6 @@
     ast))
 
 (def ^:dynamic *passes* nil)
-
-(defrecord ConstExpr [op env form tag])
 
 #?(:clj
    (defn analyze-form [env form name opts]
