@@ -926,6 +926,8 @@
   (let [var-m (var-ast env sym)]
     (VarExpr. :var-special env form (:var var-m) (:sym var-m) (:meta var-m))))
 
+(defrecord IfExpr [op env form test then else unchecked children])
+
 (defmethod parse 'if
   [op env [_ test then else :as form] name _]
   (when (< (count form) 3)
@@ -935,11 +937,12 @@
   (let [test-expr (disallowing-recur (analyze (assoc env :context :expr) test))
         then-expr (allowing-redef (analyze env then))
         else-expr (allowing-redef (analyze env else))]
-    {:env env :op :if :form form
-     :test test-expr :then then-expr :else else-expr
-     :unchecked #?(:clj  @*unchecked-if*
-                   :cljs *unchecked-if*)
-     :children [test-expr then-expr else-expr]}))
+    (IfExpr. :if env form test-expr then-expr else-expr
+             #?(:clj  @*unchecked-if*
+                :cljs *unchecked-if*)
+             [test-expr then-expr else-expr])))
+
+(defrecord CaseExpr [op env form v tests thens default children])
 
 (defmethod parse 'case*
   [op env [_ sym tests thens default :as form] name _]
