@@ -1157,6 +1157,11 @@
                 (when export-as export-as)
                 (when init-expr [init-expr])))))
 
+(defrecord UnresolvedVarExpr [op env name line column tag 
+                              shadow info binding-form?
+                              init local fn-var variadic 
+                              max-fixed-arity method-params])
+
 (defn analyze-fn-method-param [env]
   (fn [[locals params] name]
     (let [line   (get-line name env)
@@ -1167,18 +1172,12 @@
                    (locals name))
           env    (merge (select-keys env [:context])
                    {:line line :column column})
-          param  {:op :var
-                  :name name
-                  :line line
-                  :column column
-                  :tag tag
-                  :shadow shadow
-                  ;; Give the fn params the same shape
-                  ;; as a :var, so it gets routed
-                  ;; correctly in the compiler
-                  :env env
-                  :info {:name name :shadow shadow}
-                  :binding-form? true}]
+                 ;; Give the fn params the same shape
+                 ;; as a :var, so it gets routed
+                 ;; correctly in the compiler
+          param  (UnresolvedVarExpr. :var env name line column tag shadow
+                                     {:name name :shadow shadow} true
+                                     nil nil nil nil nil nil)]
      [(assoc locals name param) (conj params param)])))
 
 (defn analyze-fn-method-body [env form recur-frames]
@@ -1418,9 +1417,16 @@
                         :variadic (:variadic init-expr)
                         :max-fixed-arity (:max-fixed-arity init-expr)
                         :method-params (map :params (:methods init-expr))})
-                     be)]
-            (recur (conj bes be)
-              (assoc-in env [:locals name] be)
+                     be)
+                be' (UnresolvedVarExpr. :var (:env be) (:name be) (:line be)
+                                        (:column be) (:tag be)
+                                        (:shadow be) (:info be)
+                                        (:binding-form? be)
+                                        (:init be) (:local be) (:fn-var be)
+                                        (:variadic be) (:max-fixed-arity be)
+                                        (:method-params be))]
+            (recur (conj bes be')
+              (assoc-in env [:locals name] be')
               (next bindings))))
         [bes env]))))
 
@@ -2182,6 +2188,8 @@
   [env form]
   (disallowing-recur (parse-invoke* env form)))
 
+(defrecord VarExpr [op env form info])
+
 (defn analyze-symbol
   "Finds the var associated with sym"
   [env sym]
@@ -2194,19 +2202,18 @@
           env  (if-not (nil? column)
                  (assoc env :column column)
                  env)
-          ret  {:env env :form sym}
           lcls (:locals env)
           lb   (get lcls sym)]
       (if-not (nil? lb)
-        (assoc ret :op :var :info lb)
+        (VarExpr. :var env sym lb)
         (if-not (true? (:def-var env))
           (let [sym-meta (meta sym)
                 info     (if-not (contains? sym-meta ::analyzed)
                            (resolve-existing-var env sym)
                            (resolve-var env sym))]
-            (assoc ret :op :var :info info))
+            (VarExpr. :var env sym info))
           (let [info (resolve-var env sym)]
-            (assoc ret :op :var :info info)))))))
+            (VarExpr. :var env sym info)))))))
 
 (defn excluded?
   #?(:cljs {:tag boolean})
