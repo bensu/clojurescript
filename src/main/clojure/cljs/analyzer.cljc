@@ -1352,28 +1352,21 @@
 (defn analyze-do-statements [env exprs]
   (disallowing-recur (analyze-do-statements* env exprs)))
 
+(defrecord DoExpr [op env form statements ret children])
+
 (defmethod parse 'do
   [op env [_ & exprs :as form] _ _]
   (let [statements (analyze-do-statements env exprs)]
     (if (<= (count exprs) 1)
       (let [ret      (analyze env (first exprs))
             children (conj (vec statements) ret)]
-        {:op :do
-         :env env
-         :form form
-         :statements statements :ret ret
-         :children children})
+        (DoExpr. :do env form statements ret children))
       (let [ret-env  (if (= :statement (:context env))
                        (assoc env :context :statement)
                        (assoc env :context :return))
             ret      (analyze ret-env (last exprs))
             children (conj (vec statements) ret)]
-        {:op :do
-         :env env
-         :form form
-         :statements statements
-         :ret ret
-         :children children}))))
+        (DoExpr. :do env form statements ret children)))))
 
 (defn analyze-let-binding-init [env init loop-lets]
   (binding [*loop-lets* loop-lets]
@@ -1440,6 +1433,8 @@
             *loop-lets* loop-lets]
     (analyze-let-body* env context exprs)))
 
+(defrecord LetExpr [op env form bindings expr children])
+
 (defn analyze-let
   [encl-env [_ bindings & exprs :as form] is-loop]
   (when-not (and (vector? bindings) (even? (count bindings))) 
@@ -1457,12 +1452,7 @@
         expr         (analyze-let-body env context exprs recur-frames loop-lets)
         op           (if (true? is-loop) :loop :let)
         children     (conj (vec (map :init bes)) expr)]
-    {:op op
-     :env encl-env
-     :bindings bes
-     :expr expr
-     :form form
-     :children children}))
+    (LetExpr. op encl-env form bes expr children)))
 
 (defmethod parse 'let*
   [op encl-env form _ _]
