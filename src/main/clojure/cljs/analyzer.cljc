@@ -2149,6 +2149,8 @@
   [argc method-params]
   (boolean (some #{argc} (map count method-params))))
 
+(defrecord InvokeExpr [op env form f args children])
+
 (defn parse-invoke*
   [env [f & args :as form]]
   (let [enve (assoc env :context :expr)
@@ -2175,8 +2177,8 @@
               fn-var?
               (analyzed? f)
               (all-values? argexprs))
-        {:env env :op :invoke :form form :f fexpr :args (vec argexprs)
-         :children (into [fexpr] argexprs)}
+        (InvokeExpr. :invoke env form fexpr (vec argexprs)
+                     (into [fexpr] argexprs))
         (let [arg-syms (take argc (repeatedly gensym))]
           (analyze env
             `(let [~@(vec (interleave arg-syms args))]
@@ -2344,15 +2346,16 @@
              (analyze-seq*-wrap op env form name opts)
              (analyze env mform name opts))))))))
 
+(defrecord MapExpr [op env form keys vals children tag])
+
 (defn analyze-map
   [env form]
   (let [expr-env (assoc env :context :expr)
         ks (disallowing-recur (vec (map #(analyze expr-env %) (keys form))))
         vs (disallowing-recur (vec (map #(analyze expr-env %) (vals form))))]
-    (analyze-wrap-meta {:op :map :env env :form form
-                        :keys ks :vals vs
-                        :children (vec (interleave ks vs))
-                        :tag 'cljs.core/IMap})))
+    (analyze-wrap-meta (MapExpr. :map env form ks vs
+                                 (vec (interleave ks vs))
+                                 'cljs.core/IMap))))
 
 (defn analyze-list
   [env form]
