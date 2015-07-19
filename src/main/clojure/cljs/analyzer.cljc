@@ -919,13 +919,12 @@
                                                (:arglists-meta var)))))))]
               (analyze expr-env m))})))
 
+(defrecord VarExpr [op env form var sym meta])
+
 (defmethod parse 'var
   [op env [_ sym :as form] _ _]
-  (merge
-    {:env env
-     :op :var-special
-     :form form}
-    (var-ast env sym)))
+  (let [var-m (var-ast env sym)]
+    (VarExpr. :var-special env form (:var var-m) (:sym var-m) (:meta var-m))))
 
 (defmethod parse 'if
   [op env [_ test then else :as form] name _]
