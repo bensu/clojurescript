@@ -1301,7 +1301,7 @@
         (warning :overload-arity env {:name name-var})))
     (analyze-wrap-meta ast)))
 
-(defrecord LetExpr [op env form bindings expr children])
+(defrecord LetFnExpr [op env form bindings expr children])
 
 (defmethod parse 'letfn*
   [op env [_ bindings & exprs :as form] name _]
@@ -1344,7 +1344,7 @@
                      (conj bes be')]))
           [meth-env []] bes)
         expr (analyze (assoc meth-env :context (if (= :expr context) :return context)) `(do ~@exprs))]
-    (LetExpr. :letfn env form bes expr (conj (vec (map :init bes)) expr))))
+    (LetFnExpr. :letfn env form bes expr (conj (vec (map :init bes)) expr))))
 
 (defn analyze-do-statements* [env exprs]
   (seq (map #(analyze (assoc env :context :statement) %) (butlast exprs))))
