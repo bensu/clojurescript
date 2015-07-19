@@ -921,12 +921,12 @@
                                                (:arglists-meta var)))))))]
               (analyze expr-env m))})))
 
-(defrecord VarExpr [op env form var sym meta])
+(defrecord VarSpecialExpr [op env form var sym meta])
 
 (defmethod parse 'var
   [op env [_ sym :as form] _ _]
   (let [var-m (var-ast env sym)]
-    (VarExpr. :var-special env form (:var var-m) (:sym var-m) (:meta var-m))))
+    (VarSpecialExpr. :var-special env form (:var var-m) (:sym var-m) (:meta var-m))))
 
 (defrecord IfExpr [op env form test then else unchecked children])
 
@@ -1140,7 +1140,7 @@
           (when (and fn-var? tag)
             {:ret-tag tag})))
       (DefExpr. :def env form var-name 
-        	;; TODO: check if this map should be a VarExpr - Sebastian
+        	;; TODO: check if this map should be a VarSpecialExpr - Sebastian
                 (assoc (analyze (-> env (dissoc :locals)
                                    (assoc :context :expr)
                                    (assoc :def-var true))
