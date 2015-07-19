@@ -2183,7 +2183,7 @@
   "Finds the var associated with sym"
   [env sym]
   (if ^boolean (:quoted? env)
-    (analyze-wrap-meta {:op :constant :env env :form sym :tag 'cljs.core/Symbol})
+    (analyze-wrap-meta (ConstExpr. :constant env sym 'cljs.core/Symbol))
     (let [{:keys [line column]} (meta sym)
           env  (if-not (nil? line)
                  (assoc env :line line)
